@@ -5,3 +5,6 @@ test-event.json
 __pycache__/
 *.pyc
 .aws/
+daily_report.zip
+response2.json
+targets.json
