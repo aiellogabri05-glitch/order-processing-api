@@ -1,0 +1,7 @@
+function.zip
+response.json
+get-key.json
+test-event.json
+__pycache__/
+*.pyc
+.aws/
