@@ -1,69 +1,163 @@
-# Order Processing System — Serverless
-A complete serverless system for managing e-commerce/logistics orders, built entirely on AWS managed services (no servers to maintain). Includes a public REST API for order management and an automated daily reporting pipeline.
+# 🚀 Order Processing API
 
-## Architecture
-- **API Gateway**: public HTTP endpoint for order operations
-- **Lambda (order-processing)**: handles order creation/retrieval business logic
-- **DynamoDB**: NoSQL table storing order records (pay-per-request billing)
-- **EventBridge**: triggers the daily report Lambda on a cron schedule
-- **Lambda (daily-report)**: aggregates today's orders, builds a summary report
-- **S3**: stores historical JSON reports, one per day
-- **SES**: emails the daily summary report
+A serverless REST API built with AWS Lambda, Amazon API Gateway and DynamoDB for managing customer orders.
 
-## API Endpoints
+The project was developed as a hands-on learning journey to understand cloud-native backend development while applying software engineering principles such as modular architecture, RESTful APIs and business rule validation.
 
-### Create an order
-Response (201 Created):
-```json
-{
-  "order_id": "uuid-generated",
-  "customer_name": "Mario Rossi",
-  "items": [{"sku": "ABC123", "quantity": 2}],
-  "status": "RECEIVED",
-  "created_at": "2026-06-30T11:24:55.506854"
-}
+# ✨ Features
+
+- ✅ Create orders
+- ✅ Retrieve a single order
+- ✅ Retrieve all orders
+- ✅ Update order status
+- ✅ Order workflow validation
+- ✅ RESTful API
+- ✅ Modular architecture
+- ✅ CloudWatch logging
+
+# 🏗️ Architecture
+
+```text
+                    Client
+                       │
+                       ▼
+               Amazon API Gateway
+                       │
+                       ▼
+               AWS Lambda (Python)
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+          ▼                         ▼
+     Request Routing         Business Logic
+  (lambda_function.py)        (orders.py)
+                       │
+                       ▼
+               Amazon DynamoDB
 ```
 
-### Get an order
-Response (200 OK): same structure as above. Returns 404 if not found.
+# 📂 Project Structure
 
-## Daily Report Pipeline
-Runs automatically every day at 8:00 UTC via an EventBridge scheduled rule. For each run:
+```text
+order-processing-api/
 
-1. Scans DynamoDB for orders created that day
-2. Aggregates statistics: total orders, total items, status breakdown
-3. Saves a JSON report to S3 (`reports/{date}.json`)
-4. Sends a summary email via Amazon SES
-
-## Tech stack
-- AWS Lambda (Python 3.12) — two functions
-- Amazon API Gateway (HTTP API, payload format 2.0)
-- Amazon DynamoDB (pay-per-request)
-- Amazon EventBridge (scheduled rule)
-- Amazon S3 (report archive)
-- Amazon SES (email notifications)
-- IAM roles with least-privilege-oriented permissions
-- AWS CLI for infrastructure provisioning
-
-## Engineering notes / challenges solved
-- **Event format mismatch**: HTTP API (v2) sends the HTTP method inside `requestContext.http.method`, not `httpMethod` as in the older REST API format. Adjusted the handler accordingly.
-- **Decimal serialization**: DynamoDB returns numeric fields as Python `Decimal`, which isn't natively JSON-serializable. Implemented a custom `json.JSONEncoder` to handle conversion.
-- **Explicit routing**: Initially used a catch-all `$default` route; switched to explicit routes (`POST /orders`, `GET /orders/{id}`) to correctly populate `pathParameters` for the GET endpoint.
-- **Cross-service IAM permissions**: the report Lambda needs scoped access to DynamoDB (read), S3 (write), and SES (send) — managed via a dedicated IAM role.
-
-## Cost
-Runs entirely within AWS Free Tier for development/testing volumes — Lambda, API Gateway, DynamoDB, EventBridge, S3, and SES (sandbox mode) all have generous always-free tiers for this kind of usage.
-
-## Local development
-```bash
-# Deploy order-processing Lambda
-Compress-Archive -Path lambda_function.py -DestinationPath function.zip -Force
-aws lambda update-function-code --function-name OrderProcessingFunction --zip-file fileb://function.zip --region eu-north-1
-
-# Deploy daily-report Lambda
-Compress-Archive -Path daily_report.py -DestinationPath daily_report.zip -Force
-aws lambda update-function-code --function-name DailyReportFunction --zip-file fileb://daily_report.zip --region eu-north-1
+├── lambda_function.py
+├── orders.py
+├── constants.py
+├── responses.py
+├── README.md
+└── function.zip
 ```
 
-## Author
+# ⚙️ Technologies
+
+| Technology | Purpose |
+|------------|---------|
+| Python 3.12 | Backend language |
+| AWS Lambda | Serverless compute |
+| Amazon API Gateway | REST API |
+| Amazon DynamoDB | NoSQL database |
+| AWS IAM | Permissions |
+| Amazon CloudWatch | Monitoring & Logs |
+| Postman | API Testing |
+
+# 🌐 API Endpoints
+
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| POST | /orders | Create a new order |
+| GET | /orders | Retrieve all orders |
+| GET | /orders/{id} | Retrieve a specific order |
+| PUT | /orders/{id} | Update the order status |
+
+# 🔄 Order Workflow
+
+Every order follows a predefined workflow.
+
+```text
+RECEIVED
+     │
+     ├────────────► CANCELLED
+     │
+     ▼
+PROCESSING
+     │
+     ├────────────► CANCELLED
+     │
+     ▼
+SHIPPED
+     │
+     ▼
+DELIVERED
+```
+
+Invalid transitions return:
+
+HTTP 400 Bad Request
+
+# 🧠 Software Design
+
+The application follows the **Single Responsibility Principle (SRP)**.
+
+| Module | Responsibility |
+|---------|----------------|
+| lambda_function.py | Request routing |
+| orders.py | Business logic |
+| constants.py | Business rules |
+| responses.py | HTTP response generation |
+
+The business logic is intentionally separated from the request routing to improve maintainability and scalability.
+
+# 🚧 Roadmap
+
+## Completed
+
+- [x] Create Order
+- [x] Get Order
+- [x] List Orders
+- [x] Update Order
+- [x] Status Workflow Validation
+- [x] Modular Architecture
+
+## Next Steps
+
+- [ ] Amazon Cognito Authentication
+- [ ] JWT Authorization
+- [ ] User Management
+- [ ] Role-Based Access Control
+- [ ] Automated Testing
+- [ ] Docker Support
+- [ ] CI/CD Pipeline
+
+# 📚 Lessons Learned
+
+During the development of this project I learned:
+
+- How API Gateway routes requests to AWS Lambda.
+- How to model REST APIs.
+- How DynamoDB performs CRUD operations.
+- How to separate routing from business logic.
+- Why modular architecture improves maintainability.
+- How to implement business rules inside a backend service.
+
+## Development Log
+
+### v0.1
+- Created the first Lambda function.
+- Connected API Gateway.
+- Created the first POST endpoint.
+
+### v0.2
+- Added GET endpoints.
+- Introduced DynamoDB scan and get_item.
+
+### v0.3
+- Added PUT endpoint.
+- Implemented business workflow validation.
+- Refactored the project into multiple modules.
+
+# 👨‍💻 Author
+
 Gabriele Aiello
+Backend project developed for educational purposes with a strong focus on AWS Serverless technologies and software engineering principles.
+
