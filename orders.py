@@ -5,9 +5,17 @@ import logging
 import boto3
 
 from datetime import datetime
+from boto3.dynamodb.conditions import Key
+from auth import get_current_user
 
 from responses import response
 from constants import VALID_STATUS, ALLOWED_TRANSITIONS
+
+def is_owner(order, event):
+    """
+    Verifica se l'utente autenticato è il proprietario dell'ordine.
+    """
+    return order.get("owner") == get_current_user(event)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -20,8 +28,9 @@ table = dynamodb.Table(TABLE_NAME)
 def create_order(event):
     try:
         body = json.loads(event.get("body", "{}"))
-
+        owner = get_current_user(event)
         customer_name = body.get("customer_name")
+        
         items = body.get("items")
 
         if not customer_name or not items:
@@ -33,11 +42,13 @@ def create_order(event):
         order_id = str(uuid.uuid4())
 
         logger.info(f"Creazione ordine {order_id}")
+        logger.info(f"Owner: {owner}")
 
         order = {
             "order_id": order_id,
             "customer_name": customer_name,
             "items": items,
+            "owner": owner,
             "status": "RECEIVED",
             "created_at": datetime.utcnow().isoformat()
         }
@@ -73,7 +84,19 @@ def get_order(event):
                 {"error": "Ordine non trovato"}
             )
 
-        return response(200, result["Item"])
+        order = result["Item"]
+
+        if not is_owner(order, event):
+            logger.warning(
+                f"Tentativo di accesso non autorizzato all'ordine {order_id}"
+            )
+
+            return response(
+                404,
+                {"error": "Ordine non trovato"}
+            )
+
+        return response(200, order)
 
     except Exception as e:
         logger.exception("Errore durante il recupero dell'ordine")
@@ -81,10 +104,17 @@ def get_order(event):
 
 
 def list_orders(event):
-    try:
-        logger.info("Recupero di tutti gli ordini")
 
-        result = table.scan()
+    try:
+
+        owner = get_current_user(event)
+
+        logger.info(f"Recupero ordini per owner: {owner}")
+
+        result = table.query(
+            IndexName="OwnerIndex",
+            KeyConditionExpression=Key("owner").eq(owner)
+        )
 
         return response(
             200,
@@ -92,8 +122,13 @@ def list_orders(event):
         )
 
     except Exception as e:
+
         logger.exception("Errore durante il recupero degli ordini")
-        return response(500, {"error": str(e)})
+
+        return response(
+            500,
+            {"error": str(e)}
+        )
 
 
 def update_order(event):
@@ -134,7 +169,19 @@ def update_order(event):
                 {"error": "Ordine non trovato"}
             )
 
-        current_status = result["Item"]["status"]
+        order = result["Item"]
+
+        if not is_owner(order, event):
+            logger.warning(
+                f"Tentativo di modifica non autorizzata dell'ordine {order_id}"
+            )
+
+            return response(
+                404,
+                {"error": "Ordine non trovato"}
+            )
+
+        current_status = order["status"]
 
         allowed = ALLOWED_TRANSITIONS.get(current_status, [])
 

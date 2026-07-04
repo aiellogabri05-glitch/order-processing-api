@@ -1,0 +1,16 @@
+[
+  {
+    "Create": {
+      "IndexName": "OwnerIndex",
+      "KeySchema": [
+        {
+          "AttributeName": "owner",
+          "KeyType": "HASH"
+        }
+      ],
+      "Projection": {
+        "ProjectionType": "ALL"
+      }
+    }
+  }
+]
